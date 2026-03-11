@@ -20,26 +20,8 @@ Python3 должен быть уже установлен. Затем испол
 
 pip install -r requirements.txt
 
-
 И вот вы уже можете запустить этот проект!
 
-Так же можно скачать проект с помощью команды git clone:
-
-
-git clone https://github.com/your-username/compare-programming-jobs.git
-
-
-Перейдите в директорию проекта:
-
-
-cd compare-programming-jobs
-
-
-Создайте и активируйте виртуальное окружение (опционально, но рекомендуется):
-
-
-python -m venv venv
-source venv/bin/activate
 
 
 ## Пример запуска скрипта
