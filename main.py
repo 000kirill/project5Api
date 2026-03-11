@@ -108,7 +108,7 @@ def get_language_stats_superjob(lang, api_key):
 
 def main():
     load_dotenv()
-    api_key = os.getenv("API_KEY")
+    api_key = os.getenv("SUPERJOB_SECRET_KEY")
     
     languages = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Go", "Ruby"]
     for lang in languages:
