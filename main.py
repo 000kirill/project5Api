@@ -111,26 +111,33 @@ def main():
     api_key = os.getenv("SUPERJOB_SECRET_KEY")
     
     languages = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Go", "Ruby"]
-    for lang in languages:
-        functions = [get_language_stats_superjob(lang, api_key), get_language_stats(lang)]
+    functions = [
+        (get_language_stats_superjob, "SuperJob", api_key),
+        (get_language_stats, "HeadHunter", None)
+    ]
+    
+    for func, site_name, extra_arg in functions:
         full_stats = {}
-        for func in functions:
-            for lang in languages:
-                stats = func
-                full_stats[lang] = stats
-
-            table_data = [['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']]
-            for lang in languages:
-                stats = full_stats[lang]
-                table_data.append([
-                    lang,
-                    stats['vacancies_found'],
-                    stats['vacancies_processed'],
-                    stats['average_salary']
-                ])
-
-            table = AsciiTable(table_data)
-            print(table.table)
+        for lang in languages:
+            if extra_arg:
+                stats = func(lang, extra_arg)
+            else:
+                stats = func(lang)
+            full_stats[lang] = stats
+        
+        print(f"{site_name} статистика:")
+        table_data = [['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']]
+        for lang in languages:
+            stats = full_stats[lang]
+            table_data.append([
+                lang,
+                stats['vacancies_found'],
+                stats['vacancies_processed'],
+                stats['average_salary']
+            ])
+        table = AsciiTable(table_data)
+        print(table.table)
+        print()
 
 
 if __name__ == "__main__":
