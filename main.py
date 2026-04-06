@@ -16,94 +16,119 @@ def predict_salary(salary_from=None, salary_to=None):
     return expected_salary
 
 
-def get_language_stats(language):
-    page = 0
-    url = "https://api.hh.ru/vacancies"
+def get_language_stats(languages):
+    results = {}
+    for lang in languages:
+        page = 0
+        area = 1
+        per_page = 100
+        url = "https://api.hh.ru/vacancies"
+        
+        total_found = 0
+        all_salaries = []
+        while True:
+            params = {
+                "text": f"{lang} разработчик",
+                "area": area,
+                "per_page": per_page,
+                "page": page
+            }
+            
+            response = requests.get(url, params=params)
+            vacancies = response.json()
+            
+            if page == 0:
+                total_found = vacancies.get("found", 0)
+
+            for vacancy in vacancies.get("items", []):
+                salary = vacancy.get("salary")
+                if salary and salary.get("currency") in ["RUR"]:
+                    salary_from, salary_to = salary.get("from"), salary.get("to")
+                    predicted = predict_salary(salary_from, salary_to)
+                    if predicted:
+                        all_salaries.append(predicted)
+            page += 1
+            if page >= vacancies.get("pages", 0):
+                break
+        
+        if all_salaries:
+            average_salary = round(sum(all_salaries) / len(all_salaries))
+        else:
+            average_salary = 0
+        
+        results[lang] = {
+            "vacancies_found": total_found,
+            "vacancies_processed": len(all_salaries),
+            "average_salary": average_salary
+        }
     
-    total_found = 0
-    all_salaries = []
-    
-    while True:
-        params = {
-            "text": f"{language} разработчик",
-            "area": 1,
-            "per_page": 100,
-            "page": page
+    return results
+
+
+def get_language_stats_superjob(languages, api_key):
+    results = {}
+    for lang in languages:
+        page = 0
+        count = 20
+        url = "https://api.superjob.ru/2.0/vacancies/"
+        
+        headers = {
+            "X-Api-App-Id": api_key
         }
         
-        response = requests.get(url, params=params)
-        vacancies = response.json()
+        total_found = 0
+        all_salaries = []
         
-        if page == 0:
-            total_found = vacancies.get("found", 0)
-
-        for vacancy in vacancies.get("items", []):
-            salary = vacancy.get("salary")
-            if salary and salary.get("currency") in ["RUR"]:
-                salary_from, salary_to = salary.get("from"), salary.get("to")
+        while True:
+            params = {
+                "keyword": f"{lang} разработчик",
+                "town": "Москва",
+                "count": count, 
+                "page": page
+            }
+            
+            response = requests.get(url, headers=headers, params=params)
+            vacancies = response.json()
+            
+            if page == 0:
+                total_found = vacancies.get("total", 0)
+            
+            for vacancy in vacancies.get("objects", []):
+                salary_from = vacancy.get("payment_from")
+                salary_to = vacancy.get("payment_to")
                 predicted = predict_salary(salary_from, salary_to)
                 if predicted:
                     all_salaries.append(predicted)
-        page += 1
-        if page >= vacancies.get("pages", 0):
-            break
-    
-    if all_salaries:
-        average_salary = round(sum(all_salaries) / len(all_salaries))
-    else:
+            if not vacancies.get("more"):
+                break
+            page += 1
+
         average_salary = 0
-    
-    return {
-        "vacancies_found": total_found,
-        "vacancies_processed": len(all_salaries),
-        "average_salary": average_salary
-    }
+        if all_salaries:
+            average_salary = round(sum(all_salaries) / len(all_salaries))
 
-
-def get_language_stats_superjob(lang, api_key):
-    page = 0
-    url = "https://api.superjob.ru/2.0/vacancies/"
-    
-    headers = {
-        "X-Api-App-Id": api_key
-    }
-    
-    total_found = 0
-    all_salaries = []
-    
-    while True:
-        params = {
-            "keyword": f"{lang} разработчик",
-            "town": "Москва",
-            "count": 20, 
-            "page": page
+        results[lang] = {
+            "vacancies_found": total_found,
+            "vacancies_processed": len(all_salaries),
+            "average_salary": average_salary
         }
-        
-        response = requests.get(url, headers=headers, params=params)
-        vacancies = response.json()
-        
-        if page == 0:
-            total_found = vacancies.get("total", 0)
-        
-        for vacancy in vacancies.get("objects", []):
-            salary_from = vacancy.get("payment_from")
-            salary_to = vacancy.get("payment_to")
-            predicted = predict_salary(salary_from, salary_to)
-            if predicted:
-                all_salaries.append(predicted)
-        if not vacancies.get("more"):
-            break
-        page += 1
 
-    average_salary = 0
-    if all_salaries:
-        average_salary = round(sum(all_salaries) / len(all_salaries))
+    return results
 
-    return {
-        "vacancies_found": total_found,
-        "vacancies_processed": len(all_salaries),
-        "average_salary": average_salary
-    }
+
+def get_table(full_stats, languages, site_name):
+    print(f"{site_name} статистика:")
+    table = [['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']]
+    for lang in languages:
+        stats = full_stats[lang]
+        table.append([
+            lang,
+            stats['vacancies_found'],
+            stats['vacancies_processed'],
+            stats['average_salary']
+        ])
+    table = AsciiTable(table)
+    print(table.table)
 
 
 def main():
@@ -111,33 +136,12 @@ def main():
     api_key = os.getenv("SUPERJOB_SECRET_KEY")
     
     languages = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Go", "Ruby"]
-    functions = [
-        (get_language_stats_superjob, "SuperJob", api_key),
-        (get_language_stats, "HeadHunter", None)
-    ]
-    
-    for func, site_name, extra_arg in functions:
-        full_stats = {}
-        for lang in languages:
-            if extra_arg:
-                stats = func(lang, extra_arg)
-            else:
-                stats = func(lang)
-            full_stats[lang] = stats
-        
-        print(f"{site_name} статистика:")
-        table_data = [['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']]
-        for lang in languages:
-            stats = full_stats[lang]
-            table_data.append([
-                lang,
-                stats['vacancies_found'],
-                stats['vacancies_processed'],
-                stats['average_salary']
-            ])
-        table = AsciiTable(table_data)
-        print(table.table)
-        print()
+
+    superjob_stats = get_language_stats_superjob(languages, api_key)
+    get_table(superjob_stats, languages, "SuperJob")
+
+    hh_stats = get_language_stats(languages)
+    get_table(hh_stats, languages, "HeadHunter")
 
 
 if __name__ == "__main__":
